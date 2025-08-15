@@ -1,10 +1,10 @@
 
-#  Copyright (C) 2006, 2007, 2008 Peter Robinson
-#  Email: pjr@itee.uq.edu.au
+#  Copyright (C) 2025 Peter Robinson
+#  Email: pjr4171@gmail.com
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
+#  the Free Software Foundation; either version 3 of the License, or
 #  (at your option) any later version.
 #
 #  This program is distributed in the hope that it will be useful,
@@ -53,6 +53,7 @@ class Reader:
         while (running):
             chars = self.sock.recv(1024)
             if (chars == ''):
+                # socket has closed
                 break
             buff = buff + to_str(chars)
             pos = buff.find('\n')
@@ -60,6 +61,7 @@ class Reader:
                 message = buff[:pos]
                 # ignore the rock
                 _, message = message.split(" ", 1)
+                # call the user defined callback
                 self.callback(message)
                 buff = buff[(pos+1):]
                 pos = buff.find('\n')
@@ -72,35 +74,36 @@ class PedroClient:
 
     The client is connected to the server on initialization.
     The methods are:
+
     disconnect() - disconnect from server
     
     connect() - reconnect to server
     
     notify(term) - send a notification to the server - term is
-    a string representation of a Prolog term - 1 is returned if
-    the server accepts term; 0 otherwise.
+      a string representation of a Prolog term - 1 is returned if
+      the server accepts term; 0 otherwise.
 
     subscribe(term, goal) - subscribe to terms that match term and
-    that satisfy goal. Both term and goal are string representations
-    of Prolog terms. The ID of the subscription is returned. The ID is
-    0 if the subscription failed.
+      that satisfy goal. Both term and goal are string representations
+      of Prolog terms. The ID of the subscription is returned. The ID is
+      0 if the subscription failed.
 
     unsubscribe(id) - unsubscribe to a previous subscription with ID id
-    - ID is returned if the server succeeds in unsubscribing; otherwise
-    0 is returned.
+      - ID is returned if the server succeeds in unsubscribing; otherwise 
+      0 is returned.
 
     register(myname) - register myname as my name with the server - 0 is
-    returned iff registration failed.
+      returned iff registration failed.
 
     deregister() - deregister with server.
 
     p2p(addr, term) - send term as a p2p message to addr.
 
     get_notification() - get the first notification from the message queue
-    of notifications sent from the server as a string.
+      of notifications sent from the server as a string.
 
     get_term() - the same as get_notification except the message is parsed
-    into a representation of a Prolog term - see PedroParser.
+      into a representation of a Prolog term - see PedroParser.
 
     notification_ready() - test if a notification is ready to read.
 
@@ -110,12 +113,12 @@ class PedroClient:
     def __init__(self, ip_addr, callback, machine='localhost',
                  port=4550):
         """ Initialize the client.
-        ip_addr -- the IP address of this client
-                      - used for peer-to-peer messages.
-        callback -- a user defined function used to process each
-                    received message (the argument to the callback)
-        machine -- then address of the machine the Pedro server is running.
-        port -- the port the Pedro server is using for connections.  
+        ip_addr: the IP address of this client
+            - used for peer-to-peer messages.
+        callback: a user defined function used to process each
+            received message (the argument to the callback)
+        machine: the address of the machine the Pedro server is running.
+        port: the port the Pedro server is using for connections.  
         """
         self.machine = machine
         self.port = port
@@ -185,8 +188,6 @@ class PedroClient:
                     pass
                 return 0
             
-            
-            #self.parser = PedroParser()
             self.connected = True
             
 
@@ -281,40 +282,27 @@ class PedroClient:
         else:
             return 0
 
-    def addr2str(self, addr):
-        if isinstance(addr, str):
-            return addr
-        assert isinstance(addr, PStruct)
-        assert addr.functor.val == '@' and addr.arity() == 2
-        host = addr.args[1]
-        name = addr.args[0]
-        if isinstance(name, PStruct):
-            assert name.functor.val == ':' and name.arity() == 2
-            return str(name.args[0]) + ':'+ str(name.args[1]) + '@' + str(host)
-        else:
-            return str(name) + '@' + str(host)
 
     def p2p(self, toaddr, term):
         """ Send a p2p message to the server and return the ack. """
-        #print toaddr
-        straddr = self.addr2str(toaddr)
+        
         name = self.my_machine_name
         if (self.name == ''):
             return 0
-        elif '@' in straddr:
-            straddr = straddr.replace('localhost', "'"+name+"'")
+        elif '@' in toaddr:
+            straddr = toaddr.replace('localhost', "'"+name+"'")
             self.datasock.send(from_str('p2pmsg(' + straddr + ', '\
                                + self.name + "@'" + name\
                                +  "'," + str(term) + ')\n'))
             return self.get_ack()
         elif _p2p_var_addr.match(toaddr):
-            self.datasock.send(from_str('p2pmsg(' + straddr \
+            self.datasock.send(from_str('p2pmsg(' + toaddr \
                                    + ", " \
                                    + self.name + "@'" + name\
                                    +  "'," + str(term) + ')\n'))
             return self.get_ack()
         else:
-            self.datasock.send(from_str('p2pmsg(' + straddr \
+            self.datasock.send(from_str('p2pmsg(' + toaddr \
                                    + "@'" + name + "', " \
                                    + self.name + "@'" + name\
                                    +  "'," + str(term) + ')\n'))

@@ -1,3 +1,33 @@
+
+#  Copyright (C) 2025 Peter Robinson
+#  Email: pjr4171@gmail.com
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+""" Prolog parser for Pedro.
+This module provides a parser for Prolog terms used in the Pedro system.
+It defines classes for Prolog terms and a parser that can parse strings
+into these terms. The parser uses a recursive descent approach with
+precedence levels to handle the syntax of Prolog terms.
+
+It is expeceted that, for most applications using a Pico, simple Python string processing
+will be sufficient. This parser is provided for those who need
+to parse Prolog terms in a more structured way, such as when dealing with
+more complex Prolog structures.
+"""
+
 import re
 
 # Classes for Prolog terms
@@ -173,7 +203,7 @@ class PStruct(PObject):
     """ Prolog structure subclass of PObject.
 
     Stored as the functor and a Python list of Prolog terms representing
-    the arguments of the strudture.
+    the arguments of the structure.
     
     """
     def __init__(self,f,lst):
@@ -262,7 +292,7 @@ _retable = (
 )
 
 # A regular expression used for consuming spaces in the parser
-_spacesRE = re.compile('\s*')
+_spacesRE = re.compile(r'\s*')
 
 class PedroParser:
     
@@ -280,7 +310,8 @@ class PedroParser:
 
     def __next_token(self):
         """ Return the next tagged token from string at position pos. """
-        end = _spacesRE.match(self.string).end()
+        m_space = _spacesRE.match(self.string)
+        end = m_space.end() if m_space else 0
         self.string = self.string[end:]
         self.pos += end
         for (regexp, fun) in _retable:
