@@ -46,8 +46,7 @@ def from_str(b):
 
 
 class Reader:
-    """The message reader thread. This runs a thread that
-    reads incoming Pedro messages and processes them
+    """The message reader. This reads incoming Pedro messages and processes them
     using the user defined callback function and a timer with the supplied period."""
 
     def __init__( self, sock, callback, period):
