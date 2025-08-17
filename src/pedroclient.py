@@ -24,6 +24,13 @@ This module defines the client interface for Pedro.
 This is a simplified version of pedroclient.py from the
 Pedro release and is aimed specifically at the Raspberry Pi
 Pico running micropython.
+
+The full version of pedroclient.py runs a separate thread to read 
+incoming messages from the Pedro server and puts them on a thread safe queue.
+This is overkill for the Pico (and uses too many valuable resources) and so we use a simpler 
+approach that uses a timer to poll the data socket for incoming messages.
+
+Although supplied, peer-to-peer messages are probably not needed for Pico applications
 """
 
 import re, socket, _thread, select
@@ -41,7 +48,7 @@ def from_str(b):
 class Reader:
     """The message reader thread. This runs a thread that
     reads incoming Pedro messages and processes them
-    using the user defined callback function."""
+    using the user defined callback function and a timer with the supplied period."""
 
     def __init__( self, sock, callback, period):
         self.sock = sock
@@ -198,6 +205,7 @@ class PedroClient:
             return 0
         
         self.connected = True
+        # create a reader if required.
         if (self.reader_period > 0):
             self.reader = Reader(self.datasock, self.callback, self.reader_period)
    

@@ -6,6 +6,7 @@ import ntptime
 
 import wifi_secrets
 
+"""Connect to a WLAN network and return the IP address of the device."""
 
 def connect_wlan():
   #Connect to WLAN
@@ -27,6 +28,6 @@ def connect_wlan():
     rtc = machine.RTC()
     rtc.datetime((2000, 1, 1, 0, 0, 0, 0, 0))
     ntptime.settime()
-    print("Current time:", time.localtime(time.time() + 36000))
+    print("Current time:", time.localtime(time.time() + 36000))  # Adjust for UTC+10
     return ip
 
