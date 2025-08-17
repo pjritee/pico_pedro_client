@@ -294,7 +294,7 @@ _retable = (
 # A regular expression used for consuming spaces in the parser
 _spacesRE = re.compile(r'\s*')
 
-class PedroParser:
+class PrologParser:
     
     """A parser for Prolog terms used in Pedro.
 
@@ -314,7 +314,7 @@ class PedroParser:
         end = m_space.end() if m_space else 0
         self.string = self.string[end:]
         self.pos += end
-        for (regexp, fun) in _retable:
+        for i, (regexp, fun) in enumerate(_retable):
             m = regexp.match(self.string)
             if m:
                 self.curr_token = fun(m.group(0))
@@ -322,6 +322,7 @@ class PedroParser:
                 self.pos += end
                 self.string = self.string[end:]
                 break
+        
 
     # return the list of terms representing structure argument
     def __parseargs(self):

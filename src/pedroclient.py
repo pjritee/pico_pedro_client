@@ -28,6 +28,7 @@ Pico running micropython.
 
 import re, socket, _thread, select
 import sys
+from machine import Timer
 
 # For encoding and decoding messages sent over the socket.
 def to_str(b):
@@ -36,36 +37,42 @@ def from_str(b):
     return b.encode('utf-8')
     
 
-running = True
 
 class Reader:
     """The message reader thread. This runs a thread that
     reads incoming Pedro messages and processes them
     using the user defined callback function."""
 
-    def __init__( self, sock, callback):
+    def __init__( self, sock, callback, period):
         self.sock = sock
         self.callback = callback
-        _thread.start_new_thread(self.run, ())
-
-    def run( self):
-        buff = ""
-        while (running):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setblocking(False)
+        self.timer = Timer()
+        self.timer.init(mode=Timer.PERIODIC, period=period, callback=self.get_message)
+        self.poller = select.poll()
+        self.poller.register(sock, select.POLLIN)
+        self.buff = ""
+        
+    def get_message(self, timer):
+        fdVsEvent = self.poller.poll(1)
+        while fdVsEvent:
             chars = self.sock.recv(1024)
             if (chars == ''):
-                # socket has closed
-                break
-            buff = buff + to_str(chars)
-            pos = buff.find('\n')
+                timer.deinit()
+                return
+            self.buff = self.buff + to_str(chars)
+            pos = self.buff.find('\n')
             while (pos != -1):
-                message = buff[:pos]
+                message = self.buff[:pos]
                 # ignore the rock
                 _, message = message.split(" ", 1)
                 # call the user defined callback
                 self.callback(message)
-                buff = buff[(pos+1):]
-                pos = buff.find('\n')
-
+                self.buff = self.buff[(pos+1):]
+                pos = self.buff.find('\n')
+            fdVsEvent = self.poller.poll(1)
+        
 # for testing if a P2P address is a variable
 _p2p_var_addr = re.compile("^[_A-Z][^:]*$")
 
@@ -111,23 +118,26 @@ class PedroClient:
     """
     
     def __init__(self, ip_addr, callback, machine='localhost',
-                 port=4550):
+                 port=4550, reader_period = -1):
         """ Initialize the client.
         ip_addr: the IP address of this client
             - used for peer-to-peer messages.
         callback: a user defined function used to process each
             received message (the argument to the callback)
         machine: the address of the machine the Pedro server is running.
-        port: the port the Pedro server is using for connections.  
+        port: the port the Pedro server is using for connections.
+        reader_period: the period for the timer in the socket reader. A reader is only
+           created if this is greater than 0.
         """
         self.machine = machine
         self.port = port
+        self.reader_period = reader_period
+        self.reader = None
         self.connected = False
         self.callback = callback
         self.connect()
         self.name = ''
         self.my_machine_name = ip_addr
-        self.reader = None
         
     def getDataSocket(self):
         """ Get the Data Socket """
@@ -139,63 +149,63 @@ class PedroClient:
         
         if (self.connected):
             return 0
-        else:
-            running = True
-            # connect to info
-            infosock = socket.socket()
-            infosock.connect((self.machine, self.port))
-            # get info from server on info socket
-            pos = -1
-            buff = ''
-            while (pos == -1):
-                chars = infosock.recv(64)
-                buff = buff + to_str(chars)
-                pos = buff.find('\n')
-            parts = buff.split()
-            self.machine = parts[0]
-            ack_port = int(parts[1])
-            data_port = int(parts[2])
-            infosock.close()
-            # connect to ack
-            self.acksock = socket.socket()
-            self.acksock.connect((self.machine, ack_port))
-            # get my ID
-            pos = -1
-            buff = ''
-            while (pos == -1):
-                chars = self.acksock.recv(32)
-                buff = buff + to_str(chars)
-                pos = buff.find('\n')
-            self.id_string = buff
-            # connect to data
-            self.datasock = socket.socket()
-            self.datasock.connect((self.machine, data_port))
-            self.datasock.send(from_str(self.id_string))
-            # get ok from server on data socket
-            pos = -1
-            buff = ''
-            while (pos == -1):
-                chars = self.datasock.recv(32)
-                buff = buff + to_str(chars)
-                pos = buff.find('\n')
-            if buff != 'ok\n':
-                try:
-                    self.acksock.shutdown(socket.SHUT_RDWR)
-                    self.acksock.close()
-                    self.datasock.shutdown(socket.SHUT_RDWR)
-                    self.datasock.close()
-                except:
-                    pass
-                return 0
-            
-            self.connected = True
-            
+        
+        # connect to info
+        infosock = socket.socket()
+        infosock.connect((self.machine, self.port))
+        # get info from server on info socket
+        pos = -1
+        buff = ''
+        while (pos == -1):
+            chars = infosock.recv(64)
+            buff = buff + to_str(chars)
+            pos = buff.find('\n')
+        parts = buff.split()
+        self.machine = parts[0]
+        ack_port = int(parts[1])
+        data_port = int(parts[2])
+        infosock.close()
+        # connect to ack
+        self.acksock = socket.socket()
+        self.acksock.connect((self.machine, ack_port))
+        # get my ID
+        pos = -1
+        buff = ''
+        while (pos == -1):
+            chars = self.acksock.recv(32)
+            buff = buff + to_str(chars)
+            pos = buff.find('\n')
+        self.id_string = buff
+        # connect to data
+        self.datasock = socket.socket()
+        self.datasock.connect((self.machine, data_port))
+        self.datasock.send(from_str(self.id_string))
+        # get ok from server on data socket
+        pos = -1
+        buff = ''
+        while (pos == -1):
+            chars = self.datasock.recv(32)
+            buff = buff + to_str(chars)
+            pos = buff.find('\n')
+        if buff != 'ok\n':
+            try:
+                self.acksock.shutdown(socket.SHUT_RDWR)
+                self.acksock.close()
+                self.datasock.shutdown(socket.SHUT_RDWR)
+                self.datasock.close()
+            except:
+                pass
+            return 0
+        
+        self.connected = True
+        if (self.reader_period > 0):
+            self.reader = Reader(self.datasock, self.callback, self.reader_period)
+   
 
     def disconnect(self):
         """ Disconnect the client. """
         
         if (self.connected):
-            running = False
             self.connected = False
             try:
                 self.acksock.shutdown(socket.SHUT_RDWR)
@@ -231,11 +241,6 @@ class PedroClient:
             
     def subscribe(self, term, goal = "true", rock = 0):
         """ Send a subscription to the server and return the ack. """
-        # If a subscription is made then the reader needs
-        # to be created if it doesn't already exist.
-        if (self.reader is None):
-            self.reader = Reader(self.datasock, self.callback)
-
         if (self.connected):
             self.datasock.send(from_str('subscribe(' + str(term) + ', (' +
                            str(goal) + '), ' + str(rock) + ')\n'))
@@ -257,10 +262,6 @@ class PedroClient:
     def register(self, name):
         """ Register the client's name with the server and return the ack. """
         
-        # If a registration is made then the reader needs
-        # to be created if it doesn't already exist.
-        if (self.reader is None):
-            self.reader = Reader(self.datasock, self.callback)
         if (self.connected):
             self.datasock.send(from_str('register(' + name + ')\n'))
             ack = self.get_ack()
