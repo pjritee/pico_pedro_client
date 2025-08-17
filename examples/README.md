@@ -20,7 +20,7 @@ The python_api for Pedro includes ```pedro_gui.py```. If you run that and add th
 
 ## Using QuProlog
 QuProlog can be downloaded from https://staff.eecs.uq.edu.au/pjr/HomePages/PedroHome.html. Once downloaded
-start two terminals. In the first terminal enter the command ```qp -Afirst```. In the second enter the command ```qp -Asecond```. Using the ```-A`` switch makes this instance of QuProlog a Pedro client (```first`` and ```second`` name the process and is not relevant other that starting up the Pedro interface).
+start two terminals. In the first terminal enter the command ```qp -Afirst```. In the second enter the command ```qp -Asecond```. Using the ```-A``` switch makes this instance of QuProlog a Pedro client (```first`` and ```second`` name the process and is not relevant other that starting up the Pedro interface).
 
 In the first terminal (now in the QuProlog interpreter) enter the query ```pedro_subscribe(temperature(A, B), true,ID)```. The interpreter should respond with something like
 <code>
@@ -30,12 +30,12 @@ ID = 1
 <code>
 The following query will then create an 'infinite loop' of getting a notification and printing it out.
 <code>
-repeat, Message <<- Address, write(Message), nl, fail.
+repeat, Message \<\<- Address, write(Message), nl, fail.
 <code>
 
 In the second terminal, at any time, enter a query like
 <code>
-set_sample_rate(kitchen_thermometer, 0.2) ->> pedro.
+set_sample_rate(kitchen_thermometer, 0.2) -\>\> pedro.
 <code>
 
 The Pico sensor should then start sending notifications every 0.2 seconds.
